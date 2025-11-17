@@ -1,0 +1,513 @@
+Lab Program 11
+Aim: Implement an Ethernet LAN using n nodes and set multiple traffic nodes and
+plot congestion window for different source / destination.
+Description: This NS-2 script simulates a network environment to study the
+behavior of TCP agents and their interactions with FTP applications over a defined
+network topology. Also demonstrates how TCP handles congestion, adjusts its
+transmission rate, and ensures reliable data delivery over a simulated network. By
+varying the packet sizes, intervals, and start/stop times of the FTP applications, it
+creates realistic scenarios to study TCP performance under different traffic loads
+and link conditions.
+
+# Create a new simulator instance
+set ns [new Simulator]
+# Open trace and NAM trace files
+set tf [open lab3.tr w]
+$ns trace-all $tf
+set nf [open lab3.nam w]
+$ns namtrace-all $nf
+# Create nodes and set their properties
+set n0 [$ns node]
+$n0 color &quot;magenta&quot;
+$n0 label &quot;src1&quot;
+set n1 [$ns node]
+set n2 [$ns node]
+$n2 color &quot;magenta&quot;
+$n2 label &quot;src2&quot;
+
+set n3 [$ns node]
+$n3 color &quot;blue&quot;
+$n3 label &quot;dest2&quot;
+set n4 [$ns node]
+set n5 [$ns node]
+$n5 color &quot;blue&quot;
+$n5 label &quot;dest1&quot;
+# Create LAN and duplex links
+$ns make-lan &quot;$n0 $n1 $n2 $n3 $n4&quot; 100Mb 100ms LL Queue/DropTail
+Mac/802_3
+$ns duplex-link $n4 $n5 1Mb 1ms DropTail
+# Create TCP agents and FTP applications
+set tcp0 [new Agent/TCP]
+$ns attach-agent $n0 $tcp0
+set sink5 [new Agent/TCPSink]
+$ns attach-agent $n5 $sink5
+$ns connect $tcp0 $sink5
+set ftp0 [new Application/FTP]
+$ftp0 attach-agent $tcp0
+$ftp0 set packetSize_ 500
+$ftp0 set interval_ 0.0001
+set tcp2 [new Agent/TCP]
+$ns attach-agent $n2 $tcp2
+set sink3 [new Agent/TCPSink]
+$ns attach-agent $n3 $sink3
+$ns connect $tcp2 $sink3
+
+set ftp2 [new Application/FTP]
+$ftp2 attach-agent $tcp2
+$ftp2 set packetSize_ 600
+$ftp2 set interval_ 0.001
+# Create output files for tracing TCP windows
+set file1 [open file1.tr w]
+$tcp0 attach $file1
+set file2 [open file2.tr w]
+$tcp2 attach $file2
+# Enable congestion window tracing
+$tcp0 trace cwnd_
+$tcp2 trace cwnd_
+# Define the finish procedure
+proc finish { } {
+global ns nf tf
+$ns flush-trace
+close $tf
+close $nf
+exec nam lab3.nam &amp;
+exit 0
+}
+# Schedule events
+$ns at 0.1 &quot;$ftp0 start&quot;
+$ns at 5 &quot;$ftp0 stop&quot;
+$ns at 7 &quot;$ftp0 start&quot;
+$ns at 0.2 &quot;$ftp2 start&quot;
+$ns at 8 &quot;$ftp2 stop&quot;
+$ns at 14 &quot;$ftp0 stop&quot;
+$ns at 10 &quot;$ftp2 start&quot;
+
+$ns at 15 &quot;$ftp2 stop&quot;
+$ns at 16 &quot;finish&quot;
+# Run the simulation
+$ns run
+
+Output: // Include your output here
+Learning outcomes: //Include your Learning outcomes here
+
+Program 10
+
+Aim: Implement transmission of ping messages/traceroute over a network
+topology consisting of 6 nodes and find the number of packets dropped due to
+congestion.
+Description: A network topology with 6 nodes is simulated and the data flow
+between these notes are observed using the Ping command. The Ping command is
+a network diagnostic tool used to test connectivity between devices on a network
+and measure the time it takes for packets to travel between them. It operates by
+sending Internet Control Message Protocol (ICMP) Echo Request packets to a
+specified IP address or hostname and waiting for an Echo Reply. The command
+provides valuable information, including whether the target device is reachable, the
+round-trip time (RTT) for packets, and the rate of packet loss. This makes it a
+fundamental tool for troubleshooting network issues, diagnosing connectivity
+problems, and assessing latency.
+# Create a new simulator instance
+set ns [new Simulator]
+set p2 [new Agent/Ping]
+# Open output files for trace and NAM visualization
+set nf [open lab2.nam w]
+$ns namtrace-all $nf
+set tf [open lab2.tr w]
+$ns trace-all $tf
+
+# Create network nodes
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+# Establish links between nodes
+$ns duplex-link $n0 $n4 1005Mb 1ms DropTail
+$ns duplex-link $n1 $n4 50Mb 1ms DropTail
+$ns duplex-link $n2 $n4 2000Mb 1ms DropTail
+$ns duplex-link $n3 $n4 200Mb 1ms DropTail
+$ns duplex-link $n4 $n5 1Mb 1ms DropTail
+# Create and attach Ping agents
+set p1 [new Agent/Ping]
+$ns attach-agent $n0 $p1
+$p1 set packetSize_ 50000
+$p1 set interval_ 0.0001
+set p2 [new Agent/Ping]
+$ns attach-agent $n1 $p2
+set p3 [new Agent/Ping]
+$ns attach-agent $n2 $p3
+$p3 set packetSize_ 30000
+$p3 set interval_ 0.00001
+set p4 [new Agent/Ping]
+$ns attach-agent $n3 $p4
+set p5 [new Agent/Ping]
+
+$ns attach-agent $n5 $p5
+# Set queue limits on specific links
+$ns queue-limit $n0 $n4 5
+$ns queue-limit $n2 $n4 3
+$ns queue-limit $n4 $n5 2
+# Define the &#39;recv&#39; method for the Ping agent
+Agent/Ping instproc recv {from rtt} {
+$self instvar node_
+puts &quot;node [$node_ id] received answer from $from with round trip time $rtt
+msec&quot;
+}
+# Connect the agents for communication
+$ns connect $p1 $p5
+$ns connect $p3 $p4
+# Define a finish procedure to close trace files and launch NAM
+proc finish { } {
+global ns nf tf
+$ns flush-trace
+close $nf
+close $tf
+exec nam lab2.nam &amp;
+exit 0
+}
+# Schedule packet sending events
+for {set i 1} {$i &lt;= 10} {incr i} {
+set time [expr $i * 0.1]
+$ns at $time &quot;$p1 send&quot;
+$ns at $time &quot;$p3 send&quot;
+}
+
+# Schedule the end of the simulation
+$ns at 2.0 &quot;finish&quot;
+# Run the simulation
+$ns run
+
+Program 9 - Network Simulator
+
+Lab Program 9
+Aim: Implement three nodes point – to – point network with duplex links between
+them. Set the queue size, vary the bandwidth, and find the number of packets
+dropped.
+Description: Using network simulator NS2 a point-to-point network topology with
+three nodes is created. The links between these nodes are bidirectional (full-
+duplex) so that data can flow in both directions simultaneously. Queue Size for the
+network interfaces determine the maximum number of packets that can be held
+before dropping begins. Bandwidth is varied to observe its effect on network
+performance. Traffic is generated between nodes using a traffic model (e.g., CBR,
+FTP, or TCP). Packet Dropping Measurement is calculated by counting the number
+of packets dropped at each node during the simulation.
+Source Code:
+set ns [new Simulator] Letter S is capital
+set nf [open PA1.nam w] ; # open a nam trace file in write mode
+$ns namtrace-all $nf nf nam filename
+set tf [open PA1.tr w] ; # tf trace filename
+$ns trace-all $tf
+proc finish { } {
+global ns nf tf
+$ns flush-trace ; # clears trace file contents
+close $nf
+close $tf
+
+exec nam PA1.nam &amp;
+exit 0
+}
+set n0 [$ns node] ; # creates 3 nodes
+set n2 [$ns node]
+set n3 [$ns node]
+$ns duplex-link $n0 $n2 200Mb 10ms DropTail ;# establishing links
+$ns duplex-link $n2 $n3 1Mb 1000ms DropTail
+$ns queue-limit $n0 $n2 10
+set udp0 [new Agent/UDP] ; # attaching transport layer protocols
+$ns attach-agent $n0 $udp0
+set cbr0 [new Application/Traffic/CBR] ; # attaching application layer
+$cbr0 set packetSize_ 500
+$cbr0 set interval_ 0.005
+$cbr0 attach-agent $udp0
+set null0 [new Agent/Null] ; # creating sink (destination) node
+$ns attach-agent $n3 $null0
+$nsconnect $udp0 $null0
+$ns at 0.1 &quot;$cbr0 start&quot;
+$ns at 1.0 &quot;finish&quot;
+$ns run
+
+Awk File
+BEGIN{ c=0;}
+{
+if($1==&quot;d&quot;)
+{ c++;
+
+printf(&quot;%s\t%s\n&quot;,$5,$11);
+}
+}
+END{ printf(&quot;The number of packets dropped is %d\n&quot;,c); }
+
+CLIENT SERVER COMMUNICATION WITH DATAGRAM
+
+SOCKET
+Lab Proram 8
+
+Aim: Develop a program on a datagram socket for client/server to display the
+messages on client side, typed at the server side.
+Description: The Datagram Socket communication model uses the User Datagram
+Protocol (UDP) to send and receive data over a network. Unlike TCP, UDP is
+connectionless, meaning there is no need to establish a formal connection before
+data is sent or received. This makes it faster but less reliable, as it doesn&#39;t guarantee
+that packets will arrive in order or even at all. DatagramSocket is used for both
+the client and server to exchange messages in a chat-like manner. The server
+receives messages typed by the client and responds with its own messages, and
+vice versa.
+
+Algorithm
+Server Algorithm:
+1. Initialize Server Socket: Create a DatagramSocket and bind it to a specific
+port (e.g., 9876) so that the server can receive messages.
+2. Prepare for Receiving Data: Create a buffer (byte array) to store the
+incoming messages. Continuously listen for messages using a
+loop.
+3. Receive Message from Client: Extract the message from the packet, and
+display it on the server console.
+4. Read Server&#39;s Response.
+5. Send Response to Client.
+6. Close the Socket:
+Client Algorithm:
+1. Initialize Client Socket: Create a DatagramSocket without specifying a port
+2. Prepare for Sending Data: Continuously run a loop to send and receive
+messages.
+3. Send Message to Server:
+4. Receive Server Response:
+5. Close the Socket:
+
+UDP_Server.java(Server)
+
+import java.net.*;
+
+import java.io.*;
+public class UDP_Server {
+public static void main(String[] args) throws IOException {
+// Server creates a socket and binds it to port 9876 and listens on port 9876
+DatagramSocket serverSocket = new DatagramSocket(9876);
+//Buffer (1 KB) to hold incoming data.
+byte[] receiveBuffer = new byte[1024];
+byte[] sendBuffer;
+BufferedReader reader = new BufferedReader(new
+InputStreamReader(System.in));
+System.out.println(&quot;Server started. Waiting for client messages...&quot;);
+while (true) {
+
+// Receiving data from client -Server waits (blocking) until client sends a message.
+Once received, it is stored in receivePacket
+DatagramPacket receivePacket = new DatagramPacket(receiveBuffer,
+receiveBuffer.length);
+//Server waits (blocking) until client sends a message.
+serverSocket.receive(receivePacket);
+
+//Converts received bytes into a readable string and prints it.
+String clientMessage = new String(receivePacket.getData(), 0,
+receivePacket.getLength());
+System.out.println(&quot;Client: &quot; + clientMessage);
+// Server typing and sending response
+System.out.print(&quot;Server: &quot;);
+String serverMessage = reader.readLine();
+
+//Reply is converted into bytes.
+
+sendBuffer = serverMessage.getBytes();
+//Uses client’s IP and port (extracted from received packet) to send the reply
+back.
+InetAddress clientAddress = receivePacket.getAddress();
+int clientPort = receivePacket.getPort();
+DatagramPacket sendPacket = new DatagramPacket(sendBuffer,
+sendBuffer.length, clientAddress, clientPort);
+// Send the message to client
+serverSocket.send(sendPacket);
+// Exit on typing &quot;exit&quot;
+
+if (serverMessage.equalsIgnoreCase(&quot;exit&quot;)) {
+System.out.println(&quot;Server exited.&quot;);
+break;
+}
+}
+serverSocket.close();
+}
+}
+
+UDP_Receiver.java (Client)
+import java.net.*;
+import java.io.*;
+public class UDP_Receiver {
+public static void main(String[] args) throws IOException {
+//Client creates a UDP socket.
+DatagramSocket clientSocket = new DatagramSocket();
+//Looks up server’s IP address (here &quot;localhost&quot; → same machine).
+InetAddress serverAddress = InetAddress.getByName(&quot;localhost&quot;);
+
+byte[] sendBuffer;
+byte[] receiveBuffer = new byte[1024];
+BufferedReader reader = new BufferedReader(new
+InputStreamReader(System.in));
+
+while (true) {
+System.out.print(&quot;Client: &quot;);
+//Reads user input, converts to bytes, and sends a datagram to server:9876.
+String clientMessage = reader.readLine();
+sendBuffer = clientMessage.getBytes();
+DatagramPacket sendPacket = new DatagramPacket(sendBuffer,
+sendBuffer.length, serverAddress, 9876);
+// Send the message to the server
+clientSocket.send(sendPacket);
+// Receiving data from server
+DatagramPacket receivePacket = new DatagramPacket(receiveBuffer,
+receiveBuffer.length);
+// Block until data is received
+clientSocket.receive(receivePacket);
+
+//Converts reply bytes into string and displays it.
+String serverMessage = new String(receivePacket.getData(), 0,
+receivePacket.getLength());
+System.out.println(&quot;Server: &quot; + serverMessage);
+
+// Exit on typing &quot;exit&quot;
+
+if (clientMessage.equalsIgnoreCase(&quot;exit&quot;)) {
+System.out.println(&quot;Client exited.&quot;);
+break;
+}
+}
+clientSocket.close();
+}
+}
+
+Sample Output: //Include your Output here
+Learning Outcomes: //Include your learning outcomes here
+
+CLIENT SERVER COMMUNICATION USING TCP/IP
+Lab Program 7
+Aim: Using TCP/IP sockets, write a client-server program to make the client send
+the filename and to make the server send back the contents of the requested file if
+present.
+Description: The java Socket and ServerSocket classes are designed to implement
+TCP/IP (Transmission Control Protocol/ Internet Protocol) protocol. The main
+purpose of TCP/IP is to provide a standard and reliable means of communication
+between devices by segmenting the data into packets, and ensuring reliability
+through acknowledgments, error-checking, and retransmission of lost packets. It is
+connection-oriented communication that establishes the connection between two
+devices using three-way handshake (SYN, SYN-ACK, ACK). This protocol
+provides flow control and error control.
+Algorithm for Server
+1. Create a server socket listening on a specific port (e.g.,
+9876). 2. Accept an incoming client connection.
+3. Set up input and output streams to communicate with the client.
+4. Receive the requested file name from the client.
+5. Check if the file exists:
+a. Print the file contents
+6. If the file do not exist
+
+a. Print “File Not Found”
+7. Close the connection
+Algorithm for Client
+1. Connect to the server using the server&#39;s IP address (or hostname) and port
+number (e.g., localhost and 9876).
+2. Set up input and output streams to communicate with the server.
+3. Read the filename from the user and send it to the server.
+4. if the file exists:
+a. Print the file contents
+5. If the file do not exist
+a. Print “File Not Found”
+6. Close the connection
+Program:
+Server.java
+import java.io.*;
+import java.net.*;
+public class server {
+public static void main(String[] args) {
+ServerSocket serverSocket = null;
+Socket clientSocket = null;
+try {
+// Create a server socket listening on port 9876
+serverSocket = new ServerSocket(9876);
+System.out.println(&quot;Server started. Waiting for a client...&quot;);
+
+// Accept client connection
+clientSocket = serverSocket.accept();
+System.out.println(&quot;Client connected!&quot;);
+// Input and output streams for client communication
+
+BufferedReader inFromClient = new BufferedReader(new
+
+InputStreamReader(clientSocket.getInputStream()));
+PrintWriter outToClient = new
+PrintWriter(clientSocket.getOutputStream(), true);
+// Read the file name requested by the client
+String fileName = inFromClient.readLine();
+System.out.println(&quot;Client requested file: &quot; + fileName);
+// Attempt to open the requested file
+File file = new File(fileName);
+if (file.exists() &amp;&amp; !file.isDirectory()) {
+// If the file exists, send back the file contents
+BufferedReader fileReader = new BufferedReader(new
+FileReader(file)); String line;
+outToClient.println(&quot;FILE_FOUND&quot;);
+while ((line = fileReader.readLine()) != null) {
+outToClient.println(line);
+}
+fileReader.close();
+System.out.println(&quot;File sent successfully.&quot;);
+} else {
+// If the file doesn&#39;t exist, inform the client
+outToClient.println(&quot;FILE_NOT_FOUND&quot;);
+
+System.out.println(&quot;Requested file not found.&quot;);
+}
+} catch (IOException e) {
+e.printStackTrace();
+} finally {
+// Close the connections
+try {
+if (clientSocket != null) clientSocket.close();
+if (serverSocket != null) serverSocket.close();
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}
+}
+Client.java
+import java.io.*;
+import java.net.*;
+public class Client {
+public static void main(String[] args) {
+Socket socket = null;
+try {
+socket = new Socket(&quot;localhost&quot;, 9876);
+System.out.println(&quot;Connected to the server!&quot;);
+
+BufferedReader inFromServer = new BufferedReader(new
+
+InputStreamReader(socket.getInputStream()));
+PrintWriter outToServer = new PrintWriter(socket.getOutputStream(),
+true); BufferedReader userInput = new BufferedReader(new
+InputStreamReader(System.in));
+
+System.out.print(&quot;Enter the name of the file to request: &quot;);
+String fileName = userInput.readLine();
+// Send the file name to the server
+outToServer.println(fileName);
+// Read the response from the server
+String serverResponse =
+inFromServer.readLine(); if
+(&quot;FILE_FOUND&quot;.equals(serverResponse)) {
+System.out.println(&quot;File found! Receiving
+content:&quot;); String line;
+while ((line = inFromServer.readLine()) != null)
+{ System.out.println(line);
+}
+} else if (&quot;FILE_NOT_FOUND&quot;.equals(serverResponse))
+{ System.out.println(&quot;File not found on the server.&quot;); }
+} catch (IOException e) {
+e.printStackTrace();
+} finally {
+// Close the connection
+try {
+if (socket != null) socket.close();
+} catch (IOException e) {
+
+e.printStackTrace();
+}
+}
+}
+}
